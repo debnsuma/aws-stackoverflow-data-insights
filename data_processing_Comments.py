@@ -1,46 +1,75 @@
 import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType, TimestampType, LongType
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType
 from datetime import datetime
 
 spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 
-# Dataset path 
+# Dataset path (INPUT)
 dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
-dataset_comments = f"{dataset_bucket}Comments.xml"
+dataset_file = f"{dataset_bucket}Comments.xml"
 
 # Processed data path (OUTPUT)
-output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed/'
-output_folder_name = f"{output_bucket}Comments-parquet"
+output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
+output_folder_name = f"{output_bucket}/Comments-parquet"
 
-
+def row_parser(row):
+    
+    fields = [
+                "Id=",
+                "PostId=",
+                "Score=",
+                "Text=",
+                "CreationDate=",
+                "UserDisplayName=",
+                "UserId=",
+                "ContentLicense="
+            ]
+    
+    row_field = dict.fromkeys(fields, None)
+    row_list = [ i.strip() for i in row.split('"')[:-1] ]
+    
+    for i in range(0, len(row_list), 2):
+        if row_list[i] == 'CreationDate=':
+            row_field[row_list[i]] = datetime.strptime(row_list[i+1], "%Y-%m-%dT%H:%M:%S.%f")        
+        else:
+            row_field[row_list[i]] = row_list[i+1]
+        
+    
+    return tuple(row_field.values())
+  
 # Load the data as an RDD
-rdd = spark.sparkContext.textFile(dataset_comments)
+rdd = spark.sparkContext.textFile(dataset_file)
 
 parsed_rdd = rdd.map(lambda row: row.strip()) \
-                .filter(lambda row: row.startswith("<row")) \
-                .filter(lambda row: "UserDisplayName=" not in row) \
-                .map(lambda row: row[4:-3]) \
-                .map(lambda row: row.strip()) \
-                .filter(lambda row: len(row.split('"')) == 15) \
-                .map(lambda row: (int(row.split('"')[1]), int(row.split('"')[3]), int(row.split('"')[5]), row.split('"')[7], datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), int(row.split('"')[11]), row.split('"')[13])) 
-
+   .filter(lambda row: row.startswith("<row")) \
+   .map(lambda row: row[4:-3]) \
+   .map(lambda row: row.strip()) \
+   .map(row_parser)
+   
+   
 # Define the schema for the DataFrame
-my_schema = StructType([
-    StructField("Id", LongType()),
-    StructField("PostId", LongType()),
-    StructField("Score", LongType()),
+comments_schema = StructType([
+    StructField("Id", StringType()),
+    StructField("PostId", StringType()),
+    StructField("Score", StringType()),
     StructField("Text", StringType()),
     StructField("CreationDate", TimestampType()),
-    StructField("UserId", LongType()),
+    StructField("UserDisplayName", StringType()),
+    StructField("UserId", StringType()),
     StructField("ContentLicense", StringType())
 ])
 
 # Convert the RDD to a DataFrame
-df = parsed_rdd.toDF(my_schema)
+df = parsed_rdd.toDF(comments_schema)
 
-# Convert the RDD to a DataFrame
-df = parsed_rdd.toDF(my_schema)
+# Changing the DF DataType 
+df = df \
+    .withColumn('Id', F.col('Id').cast('int')) \
+    .withColumn('PostId', F.col('PostId').cast('int')) \
+    .withColumn('Score', F.col('Score').cast('int')) \
+    .withColumn('UserId', F.col('UserId').cast('int')) 
+    
 
 # save dataframe as csv
 df.write \
@@ -56,4 +85,6 @@ df_comments = spark.read \
          .parquet(output_folder_name)
          
 df.show()
+print(df.count())
+
 

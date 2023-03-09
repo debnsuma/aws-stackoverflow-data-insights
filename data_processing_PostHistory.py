@@ -9,90 +9,32 @@ spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
 dataset_comments = f"{dataset_bucket}/PostHistory.xml"
 
-
 def row_parser(row):
-    row_len = len(row.split('"')) 
-    result = [None] * 10
-
-    if row_len == 11:
-        result = (int(row.split('"')[1]) if row.split('"')[1] else None, 
-                  int(row.split('"')[3]) if row.split('"')[3] else None, 
-                  int(row.split('"')[5]) if row.split('"')[5] else None, 
-                  row.split('"')[7] if row.split('"')[7] else None,
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  None,
-                  None,
-                  None,
-                  None,
-                  None
-                )  
-        
-    elif row_len == 13:
-        result = (int(row.split('"')[1]) if row.split('"')[1] else None, 
-                  int(row.split('"')[3]) if row.split('"')[3] else None, 
-                  int(row.split('"')[5]) if row.split('"')[5] else None, 
-                  row.split('"')[7] if row.split('"')[7] else None,
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  int(row.split('"')[11]) if row.split('"')[11] and row.split('"')[10].strip() == 'UserId=' else None, 
-                  None,
-                  None,
-                  None,
-                  None
-                )  
     
-    elif row_len == 15:
-        result = (int(row.split('"')[1]) if row.split('"')[1] else None, 
-                  int(row.split('"')[3]) if row.split('"')[3] else None, 
-                  int(row.split('"')[5]) if row.split('"')[5] else None, 
-                  row.split('"')[7] if row.split('"')[7] else None,
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  int(row.split('"')[11]) if row.split('"')[11] and row.split('"')[10].strip() == 'UserId=' else None, 
-                  None,
-                  None,
-                  None,
-                  row.split('"')[13] if row.split('"')[13] else None
-                )     
+    fields = [
+                "Id=",
+                "PostHistoryTypeId=",
+                "PostId=",
+                "RevisionGUID=",
+                "CreationDate=",
+                "UserId=",
+                "UserDisplayName=",
+                "Comment=",
+                "Text=",
+                "ContentLicense=",
+            ]
+    
+    row_field = dict.fromkeys(fields, None)
+    row_list = [ i.strip() for i in row.split('"')[:-1] ]
+    
+    for i in range(0, len(row_list), 2):
+        if row_list[i] == 'CreationDate=':
+            row_field[row_list[i]] = datetime.strptime(row_list[i+1], "%Y-%m-%dT%H:%M:%S.%f")
         
-    elif row_len == 17:
-         result = (int(row.split('"')[1]) if row.split('"')[1] else None, 
-                  int(row.split('"')[3]) if row.split('"')[3] else None, 
-                  int(row.split('"')[5]) if row.split('"')[5] else None, 
-                  row.split('"')[7] if row.split('"')[7] else None,
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  int(row.split('"')[11]) if row.split('"')[11] and row.split('"')[10].strip() == 'UserId=' else None, 
-                  None,
-                  None,
-                  row.split('"')[13] if row.split('"')[13] else None, 
-                  row.split('"')[15] if row.split('"')[15] else None 
-                )    
-
-    elif row_len == 19:
-         result = (int(row.split('"')[1]) if row.split('"')[1] else None, 
-                  int(row.split('"')[3]) if row.split('"')[3] else None, 
-                  int(row.split('"')[5]) if row.split('"')[5] else None, 
-                  row.split('"')[7] if row.split('"')[7] else None,
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  int(row.split('"')[11]) if row.split('"')[11] and row.split('"')[10].strip() == 'UserId=' else None, 
-                  row.split('"')[13] if row.split('"')[13] else None, 
-                  None,
-                  row.split('"')[15] if row.split('"')[15] else None, 
-                  row.split('"')[17] if row.split('"')[17] else None
-                ) 
-
-    elif row_len == 21:
-         result = (int(row.split('"')[1]) if row.split('"')[1] else None, 
-                  int(row.split('"')[3]) if row.split('"')[3] else None, 
-                  int(row.split('"')[5]) if row.split('"')[5] else None, 
-                  row.split('"')[7] if row.split('"')[7] else None,
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  int(row.split('"')[11]) if row.split('"')[11] and row.split('"')[10].strip() == 'UserId=' else None, 
-                  row.split('"')[13] if row.split('"')[13] else None, 
-                  row.split('"')[15] if row.split('"')[15] else None, 
-                  row.split('"')[17] if row.split('"')[17] else None,
-                  row.split('"')[19] if row.split('"')[17] else None
-                ) 
-         
-    return result
+        else:
+            row_field[row_list[i]] = row_list[i+1]
+    
+    return tuple(row_field.values())
 
 rdd = spark.sparkContext.textFile(dataset_comments)
 
@@ -104,21 +46,30 @@ parsed_rdd = rdd.map(lambda row: row.strip()) \
    
 # Define the schema for the DataFrame
 schema_posthistory = StructType([
-    StructField("Id", LongType()),
-    StructField("PostHistoryTypeId", LongType()),
-    StructField("PostId", LongType()),
+    StructField("Id", StringType()),
+    StructField("PostHistoryTypeId", StringType()),
+    StructField("PostId", StringType()),
     StructField("RevisionGUID", StringType()),
     StructField("CreationDate", TimestampType()),
-    StructField("UserId", LongType()),
+    StructField("UserId", StringType()),
     StructField("UserDisplayName", StringType()),
     StructField("Comment", StringType()),
     StructField("Text", StringType()),
     StructField("ContentLicense", StringType())
 ])
 
+
 # Convert the RDD to a DataFrame
 df = parsed_rdd.toDF(schema_posthistory)
 
+# Changing the DF datatype/schema 
+df = df \
+    .withColumn('Id', F.col('Id').cast('int')) \
+    .withColumn('PostHistoryTypeId', F.col('PostHistoryTypeId').cast('int')) \
+    .withColumn('PostId', F.col('PostId').cast('int')) \
+    .withColumn('UserId', F.col('UserId').cast('int')) 
+    
+    
 # Dataset path 
 output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
 output_folder_name = f"{output_bucket}/PostHistory-parquet"
@@ -131,3 +82,4 @@ df.write \
   .save(output_folder_name)
 
 df.show()
+print(df.count())

@@ -91,3 +91,6 @@ df.write \
   .save(output_folder_name)
 
 df.show()
+
+df.count()
+

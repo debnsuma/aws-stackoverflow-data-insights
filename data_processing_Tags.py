@@ -7,23 +7,43 @@ spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 
 # Dataset path 
 dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
-dataset_comments = f"{dataset_bucket}/Tags.xml"
+dataset_file = f"{dataset_bucket}/Tags.xml"
 
-rdd = spark.sparkContext.textFile(dataset_comments)
+rdd = spark.sparkContext.textFile(dataset_file)
 
+def row_parser(row):
+    
+    fields = [
+                "Id=",
+                "TagName=",
+                "Count=",
+                "ExcerptPostId=",
+                "WikiPostId="
+            ]
+    
+    row_field = dict.fromkeys(fields, None)
+    row_list = [ i.strip() for i in row.split('"')[:-1] ]
+    
+    for i in range(0, len(row_list), 2):
+        row_field[row_list[i]] = row_list[i+1]
+    
+    
+    return tuple(row_field.values())
+  
 parsed_rdd = rdd.map(lambda row: row.strip()) \
    .filter(lambda row: row.startswith("<row")) \
    .map(lambda row: row[4:-3]) \
    .map(lambda row: row.strip()) \
-   .map(lambda row: (int(row.split('"')[1]), row.split('"')[3], int(row.split('"')[5]), int(row.split('"')[7]), int(row.split('"')[9])) if len(row) == 11 else (int(row.split('"')[1]), row.split('"')[3], int(row.split('"')[5]), None, None)) 
+   .map(row_parser)
    
+    
 # Define the schema for the DataFrame
 schema_tags = StructType([
-    StructField("Id", LongType()),
+    StructField("Id", StringType()),
     StructField("TagName", StringType()),
-    StructField("Count", LongType()),
-    StructField("ExcerptPostId", LongType()),
-    StructField("WikiPostId", LongType())
+    StructField("Count", StringType()),
+    StructField("ExcerptPostId", StringType()),
+    StructField("WikiPostId", StringType())
 ])
 
 # Convert the RDD to a DataFrame
@@ -47,3 +67,4 @@ df = spark.read \
          .parquet(output_folder_name)
          
 df.show()
+print(df.count())
