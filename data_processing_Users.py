@@ -9,125 +9,49 @@ spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw'
 dataset_comments = f"{dataset_bucket}/Users.xml"
 
+rdd = spark.sparkContext.textFile(dataset_comments)
 
 def row_parser(row):
-    row_len = len(row.split('"')) 
-    result = [None] * 13
     
+    fields = [
+                "Id=",
+                "Reputation=",
+                "CreationDate=",
+                "DisplayName=",
+                "LastAccessDate=",
+                "WebsiteUrl=",
+                "Location=",
+                "AboutMe=",
+                "Views=",
+                "UpVotes=",
+                "DownVotes=",
+                "ProfileImageUrl=",
+                "AccountId="
+            ]
     
-    if row_len == 27:
-        result = (int(row.split('"')[1]), 
-                  int(row.split('"')[3]),
-                  datetime.strptime(row.split('"')[5], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[7], 
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[11], 
-                  row.split('"')[13], 
-                  row.split('"')[15],  
-                  row.split('"')[17],
-                  row.split('"')[19], 
-                  row.split('"')[21],  
-                  row.split('"')[23],
-                  row.split('"')[25], 
-        ) 
-
-    elif row_len == 25:
-        result = (int(row.split('"')[1]), 
-                  int(row.split('"')[3]),
-                  datetime.strptime(row.split('"')[5], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[7], 
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[11], 
-                  row.split('"')[13], 
-                  row.split('"')[15],  
-                  row.split('"')[17],
-                  row.split('"')[19], 
-                  row.split('"')[21],  
-                  row.split('"')[23],
-                  None
-        ) 
-
-    elif row_len == 23:
-        result = (int(row.split('"')[1]), 
-                  int(row.split('"')[3]),
-                  datetime.strptime(row.split('"')[5], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[7], 
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[11], 
-                  row.split('"')[13], 
-                  row.split('"')[15],  
-                  row.split('"')[17],
-                  row.split('"')[19], 
-                  row.split('"')[21],
-                  None, 
-                  None
-        ) 
-
-    elif row_len == 21:
-        result = (int(row.split('"')[1]), 
-                  int(row.split('"')[3]),
-                  datetime.strptime(row.split('"')[5], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[7], 
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[11], 
-                  row.split('"')[13], 
-                  row.split('"')[15],  
-                  row.split('"')[17],
-                  row.split('"')[19],
-                  None,
-                  None,
-                  None
-                  )      
-        
-    elif row_len == 19:
-        result = (int(row.split('"')[1]), 
-                  int(row.split('"')[3]),
-                  datetime.strptime(row.split('"')[5], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[7], 
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[11], 
-                  row.split('"')[13], 
-                  row.split('"')[15],  
-                  row.split('"')[17],
-                  None,
-                  None,
-                  None,
-                  None
-                  )      
-        
-    elif row_len == 17:
-        result = (int(row.split('"')[1]), 
-                  int(row.split('"')[3]),
-                  datetime.strptime(row.split('"')[5], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[7], 
-                  datetime.strptime(row.split('"')[9], "%Y-%m-%dT%H:%M:%S.%f"), 
-                  row.split('"')[11], 
-                  row.split('"')[13], 
-                  row.split('"')[15],
-                  None,
-                  None,
-                  None,
-                  None, 
-                  None
-                  )          
+    row_field = dict.fromkeys(fields, None)
+    row_list = [ i.strip() for i in row.split('"')[:-1] ]
     
-
-                    
+    for i in range(0, len(row_list), 2):
+        if row_list[i] in ["LastAccessDate=", "CreationDate="]:
+            row_field[row_list[i]] = datetime.strptime(row_list[i+1], "%Y-%m-%dT%H:%M:%S.%f")
+        else:
+            row_field[row_list[i]] = row_list[i+1]
         
-    return result
+    
+    return tuple(row_field.values())
 
-rdd = spark.sparkContext.textFile(dataset_comments)
 
 parsed_rdd = rdd.map(lambda row: row.strip()) \
    .filter(lambda row: row.startswith("<row")) \
    .map(lambda row: row[4:-3]) \
    .map(lambda row: row.strip()) \
    .map(row_parser)
-   
+
 # Define the schema for the DataFrame
 schema_users = StructType([
-    StructField("Id", LongType()),
-    StructField("Reputation", LongType()),
+    StructField("Id", StringType()),
+    StructField("Reputation", StringType()),
     StructField("CreationDate", TimestampType()),
     StructField("DisplayName", StringType()),
     StructField("LastAccessDate", TimestampType()),
@@ -141,8 +65,19 @@ schema_users = StructType([
     StructField("AccountId", StringType())
 ])
 
+
 # Convert the RDD to a DataFrame
 df = parsed_rdd.toDF(schema_users)
+
+# Changing the data type 
+df = df \
+    .withColumn('Id', F.col('Id').cast('int')) \
+    .withColumn('Reputation', F.col('Reputation').cast('int')) \
+    .withColumn('Views', F.col('Views').cast('int')) \
+    .withColumn('UpVotes', F.col('UpVotes').cast('int')) \
+    .withColumn('DownVotes', F.col('DownVotes').cast('int')) \
+    .withColumn('AccountId', F.col('AccountId').cast('int')) 
+
 
 # Dataset path 
 output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
