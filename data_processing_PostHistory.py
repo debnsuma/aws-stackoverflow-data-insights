@@ -6,7 +6,7 @@ from datetime import datetime
 spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 
 # Dataset path 
-dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
+dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/2023'
 dataset_comments = f"{dataset_bucket}/PostHistory.xml"
 
 def row_parser(row):
@@ -71,7 +71,7 @@ df = df \
     
     
 # Dataset path 
-output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
+output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed/2023'
 output_folder_name = f"{output_bucket}/PostHistory-parquet"
 
 # save dataframe as csv

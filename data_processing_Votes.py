@@ -72,7 +72,7 @@ df = df \
     
 
 # Dataset path 
-output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
+output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed/2023'
 output_folder_name = f"{output_bucket}/Votes-parquet"
 
 # save dataframe as csv

@@ -6,7 +6,7 @@ from datetime import datetime
 spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 
 # Dataset path 
-dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
+dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/2023'
 dataset_file = f"{dataset_bucket}/Tags.xml"
 
 rdd = spark.sparkContext.textFile(dataset_file)
@@ -50,8 +50,15 @@ schema_tags = StructType([
 df = parsed_rdd.toDF(schema_tags)
 
 # Dataset path 
-output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
+output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed/2023'
 output_folder_name = f"{output_bucket}/Tags-parquet"
+
+# save dataframe as csv
+df.write \
+  .format('parquet') \
+  .option('header', True) \
+  .mode('overwrite') \
+  .save(output_folder_name)
 
 # save dataframe as csv
 df.write \

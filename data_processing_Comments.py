@@ -6,11 +6,11 @@ from datetime import datetime
 spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 
 # Dataset path (INPUT)
-dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
+dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/2023'
 dataset_file = f"{dataset_bucket}Comments.xml"
 
 # Processed data path (OUTPUT)
-output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
+output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed/2023'
 output_folder_name = f"{output_bucket}/Comments-parquet"
 
 def row_parser(row):

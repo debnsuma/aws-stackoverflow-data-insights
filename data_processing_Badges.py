@@ -6,7 +6,7 @@ from datetime import datetime
 spark = SparkSession.builder.appName("Data Processing").getOrCreate()
 
 # Dataset path 
-dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/'
+dataset_bucket = 's3://stackoverflow-dataset-2023/dataset/raw/2023'
 dataset_comments = f"{dataset_bucket}/Badges.xml"
 
 def row_parser(row):
@@ -62,7 +62,7 @@ df = df \
     .withColumn('UserId', F.col('UserId').cast('int')) 
     
 # Dataset path 
-output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed'
+output_bucket = 's3://stackoverflow-dataset-2023/dataset/raw-processed/2023'
 output_folder_name = f"{output_bucket}/Badges-parquet"
 
 # save dataframe as csv
